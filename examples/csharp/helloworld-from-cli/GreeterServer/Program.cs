@@ -13,39 +13,58 @@
 // limitations under the License.
 
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using Grpc.Core;
 using Helloworld;
 
+// File modified according to https://stackoverflow.com/questions/37714558/how-to-enable-server-side-ssl-for-grpc
+
 namespace GreeterServer
 {
-    class GreeterImpl : Greeter.GreeterBase
+  class GreeterImpl : Greeter.GreeterBase
+  {
+    // Server side handler of the SayHello RPC
+    public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
     {
-        // Server side handler of the SayHello RPC
-        public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
-        {
-            return Task.FromResult(new HelloReply { Message = "Hello " + request.Name });
-        }
+      return Task.FromResult(new HelloReply {Message = "Hello " + request.Name});
     }
+  }
 
-    class Program
+  class Program
+  {
+    const int Port = 50051;
+
+    public static void Main(string[] args)
     {
-        const int Port = 50051;
+      // Server server = new Server
+      // {
+      //     Services = { Greeter.BindService(new GreeterImpl()) },
+      //     Ports = { new ServerPort("localhost", Port, ServerCredentials.Insecure) }
+      // };
+      // server.Start();
 
-        public static void Main(string[] args)
-        {
-            Server server = new Server
-            {
-                Services = { Greeter.BindService(new GreeterImpl()) },
-                Ports = { new ServerPort("localhost", Port, ServerCredentials.Insecure) }
-            };
-            server.Start();
+      var cacert = File.ReadAllText(@"../ca.crt");
+      var servercert = File.ReadAllText(@"../server.crt");
+      var serverkey = File.ReadAllText(@"../server.key");
+      var keypair = new KeyCertificatePair(servercert, serverkey);
+      var sslCredentials = new SslServerCredentials(new List<KeyCertificatePair>() {keypair}, cacert, false);
 
-            Console.WriteLine("Greeter server listening on port " + Port);
-            Console.WriteLine("Press any key to stop the server...");
-            Console.ReadKey();
+      var server = new Server
+      {
+        //  Services = {GrpcTest.BindService(new GrpcTestImpl(writeToDisk))},
+        Services = {Greeter.BindService(new GreeterImpl())},
+        Ports = {new ServerPort("0.0.0.0", 555, sslCredentials)}
+      };
+      server.Start();
 
-            server.ShutdownAsync().Wait();
-        }
+
+      Console.WriteLine("Greeter server listening on port " + Port);
+      Console.WriteLine("Press any key to stop the server...");
+      Console.ReadKey();
+
+      server.ShutdownAsync().Wait();
     }
+  }
 }

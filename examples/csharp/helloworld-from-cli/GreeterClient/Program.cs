@@ -13,26 +13,36 @@
 // limitations under the License.
 
 using System;
+using System.IO;
 using Grpc.Core;
 using Helloworld;
 
+// File modified according to https://stackoverflow.com/questions/37714558/how-to-enable-server-side-ssl-for-grpc
+
 namespace GreeterClient
 {
-    class Program
+  class Program
+  {
+    public static void Main(string[] args)
     {
-        public static void Main(string[] args)
-        {
-            Channel channel = new Channel("127.0.0.1:50051", ChannelCredentials.Insecure);
+      // Channel channel = new Channel("127.0.0.1:50051", ChannelCredentials.Insecure);
+      // var client = new Greeter.GreeterClient(channel);
+      var cacert = File.ReadAllText(@"../ca.crt");
+      var clientcert = File.ReadAllText(@"../client.crt");
+      var clientkey = File.ReadAllText(@"../client.key");
+      var ssl = new SslCredentials(cacert, new KeyCertificatePair(clientcert, clientkey));
+      var channel = new Channel("localhost", 555, ssl);
+      var client = new Greeter.GreeterClient(channel);
+      // var client = new GrpcTest.GrpcTestClient(channel);
 
-            var client = new Greeter.GreeterClient(channel);
-            String user = "you";
+      String user = "you";
 
-            var reply = client.SayHello(new HelloRequest { Name = user });
-            Console.WriteLine("Greeting: " + reply.Message);
+      var reply = client.SayHello(new HelloRequest {Name = user});
+      Console.WriteLine("Greeting: " + reply.Message);
 
-            channel.ShutdownAsync().Wait();
-            Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
-        }
+      channel.ShutdownAsync().Wait();
+      Console.WriteLine("Press any key to exit...");
+      Console.ReadKey();
     }
+  }
 }
